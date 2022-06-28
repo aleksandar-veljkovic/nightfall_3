@@ -99,7 +99,7 @@ async function transfer(transferParams) {
 
   // KEM-DEM encryption
   const [ePrivate, ePublic] = await genEphemeralKeys();
-  const [unpackedTokenID, packedErc] = packSecrets(tokenId, ercAddress);
+  const [unpackedTokenID, packedErc] = packSecrets(tokenId, ercAddress, 0, 2);
   const compressedSecrets = encrypt(
     generalise(ePrivate),
     generalise(ePublic),
