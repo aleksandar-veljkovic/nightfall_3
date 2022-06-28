@@ -5,9 +5,13 @@ or use clientCommitmentSync to decrypt when new ivk is received.
 
 import config from 'config';
 import logger from 'common-files/utils/logger.mjs';
-import Secrets from '../classes/secrets.mjs';
+import { generalise } from 'general-number';
 import { getAllTransactions } from './database.mjs';
 import { countCommitments, storeCommitment } from './commitment-storage.mjs';
+import { decrypt, packSecrets } from '../classes/kem-dem.mjs';
+import { calculatePkd } from './keys.mjs';
+import Commitment from '../classes/commitment.mjs';
+import { edwardsDecompress } from '../utils/crypto/encryption/elgamal.mjs';
 
 const { ZERO } = config;
 
@@ -18,16 +22,27 @@ export async function decryptCommitment(transaction, ivk, nsk) {
   const nonZeroCommitments = transaction.commitments.flat().filter(n => n !== ZERO);
   const storeCommitments = [];
   ivk.forEach((key, j) => {
-    // decompress the secrets first and then we will decryp t the secrets from this
-    const decompressedSecrets = Secrets.decompressSecrets(transaction.compressedSecrets);
-    logger.info(`decompressedSecrets: ${decompressedSecrets}`);
+    const { pkd, compressedPkd } = calculatePkd(generalise(key));
     try {
-      const commitment = Secrets.decryptSecrets(decompressedSecrets, key, nonZeroCommitments[0]);
-      if (Object.keys(commitment).length === 0)
-        logger.info("This encrypted message isn't for this recipient");
-      else {
-        // console.log('PUSHED', commitment, 'nsks', nsks[i]);
+      const [packedErc, unpackedTokenID, ...rest] = decrypt(
+        generalise(key),
+        generalise(edwardsDecompress(transaction.compressedSecrets[0])),
+        generalise(transaction.compressedSecrets.slice(1)),
+      );
+      const [erc, tokenId] = packSecrets(generalise(packedErc), generalise(unpackedTokenID), 2, 0);
+      const plainTexts = generalise([erc, tokenId, ...rest]);
+      const commitment = new Commitment({
+        compressedPkd,
+        pkd,
+        ercAddress: plainTexts[0].bigInt,
+        tokenId: plainTexts[1].bigInt,
+        value: plainTexts[2].bigInt,
+        salt: plainTexts[3].bigInt,
+      });
+      if (commitment.hash.hex(32) === nonZeroCommitments[0]) {
         storeCommitments.push(storeCommitment(commitment, nsk[j]));
+      } else {
+        logger.info("This encrypted message isn't for this recipient");
       }
     } catch (err) {
       logger.info(err);
