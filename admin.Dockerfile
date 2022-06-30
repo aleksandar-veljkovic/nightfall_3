@@ -9,7 +9,7 @@ WORKDIR /app/cli
 RUN npm ci
 
 WORKDIR /app/admin
-COPY config/default.js config/default.js
+COPY config app/config
 RUN apt-get update -y
 RUN apt-get install -y netcat-openbsd
 COPY nightfall-administrator/src src

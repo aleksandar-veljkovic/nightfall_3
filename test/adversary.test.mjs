@@ -14,7 +14,7 @@ import {
   waitForSufficientBalance,
   registerProposerOnNoProposer,
   retrieveL2Balance,
-} from './utils.mjs';
+} from './utils/utils.mjs';
 import logger from '../common-files/utils/logger.mjs';
 
 const { expect } = chai;
